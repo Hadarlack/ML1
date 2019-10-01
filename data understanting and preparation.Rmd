@@ -1,0 +1,440 @@
+---
+title: "project_ted"
+author: "ofir_hadar"
+date: "16 בדצמבר 2017"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+```{r}
+summary(ted_main)
+
+```
+
+```{r com}
+sd(ted_main$comments)
+
+```
+```{r}
+hist(ted_main$comments)
+```
+
+```{r plot com}
+hist(ted_main$comments, axes=F,main='comments',xlab='amount of comments');axis(1,at= seq(0,6000,500));axis(2, at= seq(0,3000,500))
+```
+```{r}
+d <- density(ted_main$comments) # returns the density data 
+plot(d) 
+
+```
+```{r commentsss}
+
+co <- subset(ted_main, comments<=500, comments )
+
+a <- ggplot(co)+aes(x=comments)+geom_histogram(breaks=seq(0, 500, by=50), 
+                 col="black", 
+                 aes(fill=..count..)) +
+  scale_fill_gradient("Count", low="green", high="red")
+print(a)
+
+cor(ted_main$comments, ted_main$views)
+
+library("ggpubr")
+
+ggscatter(ted_main, x = "comments", y = "views", 
+          add = "reg.line", conf.int = TRUE, 
+          cor.coef = TRUE, cor.method = "pearson",
+          xlab = "comments", ylab = "views")
+```
+
+
+
+```{r duration}
+ted_main$duration <- (ted_main$duration)/60
+summary(ted_main$duration)
+
+```
+
+
+
+```{r events}
+filePath <- "C:\\Users\\hadarlac\\Downloads\\another devision.csv"
+table <- read.csv(filePath, header = F)
+thisShit <- table
+y <- sqldf("select V18, avg(V17) as V17
+           from thisShit
+           group by V18")
+
+ggplot(table) + aes(x=V18, y=log(V17),colour=V18) + geom_boxplot() + geom_point(data = y, size = 15, shape="-")+ labs (y="events")+theme(axis.text.x = element_text(angle=70,hjust = 1))
+cor.test(table$V17, table$V18, method = "spearman")
+model <- lm(log(table$V17) ~ table$V18, data = table)
+analysis <- Anova(model, idata = table)
+print(analysis)
+```
+
+
+
+```{r lenguages}
+summary(ted_main$languages)
+sd(ted_main$languages)
+
+ggscatter(ted_main, x = "languages", y = "views", 
+          add = "reg.line", conf.int = TRUE, 
+          cor.coef = TRUE, cor.method = "pearson",
+          xlab = "languages", ylab = "views")
+
+```
+
+
+
+```{r speakers}
+
+speak<- sqldf("select main_speaker, count(main_speaker) as num_of_appearances_of_same_speaker
+   		           from ted_main
+     		         group by main_speaker")
+sort(speak$num_of_appearances_of_same_speaker)
+
+ggplot(speak)+aes(x=main_speaker, y=num_of_appearances)+geom_bar(stat="identity")
+
+numm <- sqldf("select num_of_appearances_of_same_speaker, count(main_speaker) as count 
+   		           from speak
+     		         group by num_of_appearances_of_same_speaker
+   		           ")
+numm
+
+```
+
+
+```{r numOf}
+hist(ted_main$num_speaker)
+summary(ted_main$num_speaker)
+numm <- sqldf("select num_speaker, count(num_speaker) as number
+   		           from ted_main
+     		         group by num_speaker
+   		           ")
+numm
+```
+
+
+```{r published year and views}
+ted_main$published_date <- anytime(ted_main$published_date)
+ted_main$published_date <- substr(ted_main$published_date, 1, 4)
+ted_main$published_date<-factor(ted_main$published_date)
+ggplot(ted_main)+aes(x=published_date, y=views)+geom_bar(stat="identity")
+ggplot(ted_main, aes(x = published_date, y = views)) + theme_bw() + geom_bar(stat = "identity")
+
+```
+
+
+```{r published month}
+ted_main$published_date <- anytime(ted_main$published_date)
+ted_main$published_date <- substr(ted_main$published_date, 6, 7)
+ted_main$published_date<-factor(ted_main$published_date)
+ggplot(ted_main)+aes(x=published_date, y=views)+geom_bar(stat="identity")
+ggplot(ted_main, aes(x = published_date, y = views)) + theme_bw() + geom_bar(stat = "identity")
+
+```
+
+
+```{r month and year vs views}
+ted_main$published_date <- anytime(ted_main$published_date)
+ted_main$published_date_year <- substr(ted_main$published_date, 1, 4)
+ted_main$published_date_month <- substr(ted_main$published_date, 6, 7)
+
+#calculate number of views per month for each year. First we need to group the data and count views within each group:
+  
+monthly_views <- sqldf("select published_date_month, published_date_year, sum(views) as views
+                       from ted_main
+                       group by published_date_month, published_date_year")
+
+
+ 
+ted_main$published_date_year<-as.factor(ted_main$published_date_year)
+ted_main$views<-as.factor(ted_main$views)
+ted_main$published_date_month<-as.integer(ted_main$published_date_month)
+
+ggplot(data = monthly_views, aes(x = published_date_month, y = views , group= published_date_year, color = published_date_year)) +
+    geom_line()
+
+```
+
+
+```{r rarings}
+table <- ted_main_initial
+table$ratings <- as.character(table$ratings)
+
+v <- strsplit(table$ratings, ",")
+ratings <- rep(0, length(v))
+place <- 1
+for (i in 1:length(v)){
+  jumps <- seq(1,(length(v[[i]])),3)
+  for (j in jumps){
+    ans <- strsplit(v[[i]][j+1], ":")
+    ans <- gsub(" ","",ans[[1]][2])
+    ratings[place] <- ans
+    place <- place+1
+  }
+}
+
+ratings <- as.data.frame(ratings) #all the ratings of all the videos
+
+ratingsCount <- rep(0, length(v))
+place <- 1
+for (i in 1:length(v)){
+  jumps <- seq(1,(length(v[[i]])),3)
+  for (j in jumps){
+    ans <- strsplit(v[[i]][j+2], ":")
+    ans <- gsub(" ","",ans[[1]][2])
+    ans <- gsub("}","",ans)
+    ans <- gsub("\\]","",ans)
+    ratingsCount[place] <- ans
+    place <- place+1
+  }
+}
+
+ratingsCount <- as.data.frame(ratingsCount)
+
+
+ratingsTable <- cbind(ratings,ratingsCount)
+ratingsTable["videoNumber"] <- 0
+index <- 1
+for(i in 0:(nrow(table)-1)){
+  for(j in 1:14){
+    ratingsTable[i*14+j,"videoNumber"] <- index
+  }
+  index <- index+1
+}
+
+
+ratingsPerRow <- sqldf("select videoNumber, sum(ratingsCount) as totCount
+from ratingsTable
+group by videoNumber")
+
+ratingsTable <- merge(ratingsTable, ratingsPerRow, by="videoNumber")
+
+ratingsTable$ratingsCount <- as.numeric(as.character(ratingsTable$ratingsCount))
+
+ratingsTable <- mutate(ratingsTable, rateStrength= ratingsCount/totCount)
+
+
+#create vector of unique ratings
+uniqueRatings <- unique(ratings)
+uniqueRatings <- as.data.frame(uniqueRatings)
+
+
+#set and calculate new attributes
+for(i in 1:nrow(uniqueRatings)){
+  colName <- as.character(uniqueRatings$ratings[i])
+  table[colName] <- NA #create new column with name as selected tag
+  for(j in 1:nrow(table)){
+    table[j,colName] <- subset(ratingsTable, (videoNumber==j & ratings==colName), select= c(rateStrength))
+  }
+}
+
+# path <- "C:\\Users\\Ofir\\Desktop\\MLDM\\ted_main.csv"
+# write.csv(table,path)
+```
+
+
+```{r occupation}
+occVSviews <- sqldf("select speaker_occupation, sum(views) as totViews
+   		           from ted_main
+     		         group by speaker_occupation
+                 order by totViews desc
+   		           limit 10
+   		           ")
+
+
+ggplot(occVSviews)+aes(x=speaker_occupation, reorder(speaker_occupation, totViews), y=totViews)+geom_histogram(breaks=seq(50000, 100000, by=10000),stat = "identity")+theme(axis.text.x = element_text(angle=40,hjust = 1))
+
+
+
+```
+
+
+
+```{r tagss}
+path <- "C:\\Users\\hadarlac\\Downloads\\ted_main_initial.csv"
+table <- read.csv(path, header = T)
+
+table$tags <- as.character(table$tags)
+
+#split all the tags into a list
+v <- strsplit(table$tags, ",")
+#create a vector for clean tags
+tags <- rep(0, length(v))
+#counter
+place <- 1
+#run on all the list, clean the tags and insert them into a vector
+for (i in 1:length(v)){
+  for(j in 1:length(v[[i]])){
+    tags[place] <- v[[i]][j]
+    tags[place] <- gsub("\\[","",tags[place])
+    tags[place] <- gsub("\\]","",tags[place])
+    tags[place] <- gsub(" ","",tags[place])
+    place <- place+1
+  }
+}
+
+table[,"tags"] <- gsub(" ","",table[,"tags"])
+#create vector of unique tags
+uniqueTags <- unique(tags)
+uniqueTags <- as.data.frame(uniqueTags)
+#count how many times each tag apeared
+uniqueTagsCount <- rep(0,dim(uniqueTags)[1])
+for (i in 1:dim(uniqueTags)[1]){
+  str <- paste0("^",uniqueTags$uniqueTags[i])
+  uniqueTagsCount[i] <- length(grep(str, tags))
+}
+
+#bind the tags and count to one table
+tagsTable <- as.data.frame(cbind(uniqueTags,uniqueTagsCount))
+tagsTable$uniqueTagsCount <- as.integer(tagsTable$uniqueTagsCount)
+tagsTable$proportion <- (tagsTable$uniqueTagsCount)/length(tags)
+
+#choose the top 10 as attributes
+selectedTags <- sqldf("select uniqueTags,uniqueTagsCount
+from tagsTable
+order by uniqueTagsCount DESC
+limit 10")
+
+ggplot(selectedTags)+aes(x=uniqueTags, y=uniqueTagsCount)+geom_histogram(stat = "identity")+theme(axis.text.x = element_text(angle=40,hjust = 1))
+
+#set and calculate new attributes
+for(i in 1:nrow(selectedTags)){
+  colName <- as.character(selectedTags$uniqueTags[i])
+  table[colName] <- 0 #create new column with name as selected tag
+  table[grep(colName, table[,"tags"]),colName] <- 1#1 if tag 0 if not tagged
+}
+
+summary(table)
+
+# path <- "C:\\Users\\hadarlac\\Downloads\\ted_main_initial.csv"
+# write.csv(table,path)
+
+```
+
+
+```{r lable}
+#import table and create table of it
+path <- "C:\\Users\\hadarlac\\Downloads\\ted_main_initial.csv"
+data <- read.csv(path, header = T)
+
+#create years
+data$published_date <- anytime(data$published_date)
+
+data$published_date <- substr(data$published_date, 1, 4)
+data$published_date<-factor(data$published_date)
+
+levels(data$published_date)
+colnames(data)
+
+table1 <- data
+
+#calculate mean and std for each attribute
+normalTable <- sqldf("select published_date, avg(views) as avgViews, STDEV(views) as stdViews, avg(comments) as avgComments, STDEV(comments) as stdComments, avg(languages) as avgLanguages, STDEV(languages) as stdLanguages
+                     from data
+                     group by published_date")
+
+#merge into data
+data <- merge(data, normalTable, "published_date")
+
+#normalize each attribute
+data <- mutate(data, normViews= (views-avgViews)/stdViews)
+data <- mutate(data, normComments= (comments-avgComments)/stdComments)
+data <- mutate(data, normLanguages= (languages-avgLanguages)/stdLanguages)
+
+#calculate the rate
+data <- mutate(data, rate= 0.5*normViews + 0.3*normComments + 0.2*normLanguages)
+#hist(data$rate)
+
+#check distribution in order to divide into categories
+ggplot(data, aes(rate)) +
+  geom_histogram(binwidth = 0.25)+
+  scale_x_continuous(breaks=seq(-1.125,11,0.25))+
+  theme(axis.text.x = element_text(angle=70,hjust = 1))
+
+#set the lables
+copy <- sqldf("select data.*, case when (rate<=(-0.625)) then 'bad' when ((rate>(-0.625))&(rate<=(0.125))) then 'ok' when ((rate>(0.125))&(rate<=(0.875))) then 'good' else 'great' end as lable
+              from data")
+
+#valitaed rates in range of lables
+validate <- sqldf("select lable, min(rate) as min, max(rate) as max
+                  from copy
+                  group by lable")
+
+#check proportion
+nrow <- dim(copy)[1]
+
+numGreat <- sqldf("select count(lable)
+              from copy
+              where lable=='great'")
+numGreat <- as.integer(numGreat)
+propGreat <- numGreat/nrow # 7.5%
+
+
+numGood <- sqldf("select count(lable)
+              from copy
+              where lable=='good'")
+numGood <- as.integer(numGood)
+propGood <- numGood/nrow # 20%
+
+numOK <- sqldf("select count(lable)
+              from copy
+              where lable=='ok'")
+numOK <- as.integer(numOK)
+propOK <- numOK/nrow # 65%
+
+numBad <- sqldf("select count(lable)
+              from copy
+              where lable=='bad'")
+numBad <- as.integer(numBad)
+propBad <- numBad/nrow # 7.5%
+```
+
+
+
+```{r corelation}
+library(corrplot)
+corData<-read.csv('C:\\Users\\hadarlac\\Downloads\\cor.csv', header=T) #only numeric variables including rate
+corrplot::corrplot(cor(corData),order = "hclust", method = "square") #creates correlation Matrix 
+```
+
+```{r PCA}
+# load data
+path <- "C:\\Users\\hadarlac\\Documents\\hadar ofir\\ted_main.csv"
+data <- read.csv(path, header = T)
+rm(path)
+#create PCA
+data[,2] <- NULL
+data[,15:25] <- NULL
+data <- scale(data) # data has just the continous variables
+
+# load data
+path <-  "C:\\Users\\hadarlac\\Documents\\hadar ofir\\ted_main.csv"
+dataDiscrete <- read.csv(path, header = T)
+rm(path)
+dataDiscrete[,1] <- NULL
+dataDiscrete[,2:14] <- NULL
+
+pca <-  prcomp(data)
+summary(pca) #shows the results
+
+screeplot(pca) #Shows the differance in variacne 
+pca$rotation # loadings
+
+x <- pca$x
+xtill80 <- as.data.frame(x[,1:7]) # we take variables that explain 80% of the data
+
+afterPCA <- cbind(xtill80,dataDiscrete) # the pca1-pca7 with the descrete variables
+biplot(pca, col=c(1,2), cex=c(0.1,1))
+
+# path <- "C:\\Users\\ofir\\Desktop\\MLDM\\afterPCA.csv"
+# write.csv(afterPCA, path)
+```
+
